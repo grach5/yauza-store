@@ -50,6 +50,17 @@
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --transition: 420ms var(--ease);
+
+  /* ---- Интерактивные 3D-эффекты: наклон карточек, параллакс, вращение медальона ---- */
+  --tilt-perspective: 1100px;
+  --tilt-max-deg: 7;
+  --tilt-transition: 220ms;
+  --tilt-glow-color: var(--color-accent-soft);
+  --jewel-perspective: 900px;
+  --jewel-spin-duration: 13s;
+  --parallax-buffer: 110px;
+  --parallax-factor: 0.16;
+  --parallax-max: 90;
 }
 
 /* ---------------------------------- Reset ---------------------------------- */
@@ -400,12 +411,23 @@ h2.section-title {
 
 .hero-bg {
   position: absolute;
-  inset: 0;
+  top: calc(-1 * var(--parallax-buffer));
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: -1;
   background:
     radial-gradient(560px 420px at 88% -6%, rgba(201, 162, 74, 0.22), transparent 60%),
     radial-gradient(480px 380px at 6% 18%, rgba(184, 121, 138, 0.16), transparent 65%),
     linear-gradient(180deg, var(--color-ink) 0%, var(--color-bg) 45%, var(--color-bg) 100%);
+  will-change: transform;
+}
+
+/* JS выставляет translate3d(); без JS/при уменьшенном движении остаётся 0 — доп. предохранитель */
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg {
+    transform: none !important;
+  }
 }
 
 .hero-bg svg {
@@ -510,27 +532,38 @@ h2.section-title {
   justify-content: center;
   aspect-ratio: 1;
   min-height: 260px;
+  perspective: var(--jewel-perspective);
 }
 
 .hero-jewel svg {
   width: 100%;
   height: 100%;
   max-width: 420px;
+  transform-style: preserve-3d;
+}
+
+.hero-jewel .facet-rotate {
+  transform-style: preserve-3d;
+  transform-origin: 210px 210px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .hero-jewel .facet-rotate {
-    animation: facet-spin 34s linear infinite;
-    transform-origin: 210px 210px;
+    animation: facet-spin-3d var(--jewel-spin-duration) linear infinite;
   }
   .hero-jewel .facet-glow {
     animation: facet-pulse 4.5s ease-in-out infinite;
   }
 }
 
-@keyframes facet-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* Полноценное 3D-вращение вокруг вертикальной оси (rotateY) с лёгким наклоном (rotateX)
+   для ощущения объёма грани, а не плоского поворота в плоскости экрана. */
+@keyframes facet-spin-3d {
+  0%   { transform: rotateY(0deg) rotateX(5deg); }
+  25%  { transform: rotateY(90deg) rotateX(-4deg); }
+  50%  { transform: rotateY(180deg) rotateX(5deg); }
+  75%  { transform: rotateY(270deg) rotateX(-4deg); }
+  100% { transform: rotateY(360deg) rotateX(5deg); }
 }
 
 @keyframes facet-pulse {
@@ -607,20 +640,50 @@ h2.section-title {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
+  perspective: var(--tilt-perspective);
 }
 
 .catalog-card {
+  position: relative;
   background: linear-gradient(165deg, var(--color-surface), var(--color-bg-alt));
   border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
-  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+  transform-style: preserve-3d;
+  will-change: transform;
+  /* transform двигается быстро вслед за курсором, а цвет/тень — плавно, как раньше */
+  transition: transform var(--tilt-transition) var(--ease), border-color var(--transition), box-shadow var(--transition);
 }
 
 .catalog-card:hover {
   transform: translateY(-6px);
   border-color: var(--color-accent-dim);
   box-shadow: var(--shadow-soft);
+}
+
+/* Световой блик, повторяющий направление наклона — в духе игры света на грани украшения */
+.catalog-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--tilt-glow-x, 50%) var(--tilt-glow-y, 20%),
+    rgba(230, 205, 143, 0.55),
+    transparent 58%
+  );
+  opacity: var(--tilt-glow-o, 0);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  transition: opacity var(--tilt-transition) var(--ease);
+  z-index: 0;
+}
+
+.catalog-icon,
+.catalog-card h3,
+.catalog-card p {
+  position: relative;
+  z-index: 1;
 }
 
 .catalog-icon {
