@@ -185,6 +185,142 @@
     updateParallax();
   }
 
+  /* --------------------------- «Живая» нить бисера --------------------------- */
+  /* Сигнатурная нить (.strand) не просто мерцает синхронно (это уже делает CSS-keyframe
+     strand-shimmer) — здесь каждая бусина по очереди «вспыхивает» лёгким случайным бликом,
+     как будто на неё падает свет витрины. Три источника вспышек:
+       1) случайный фоновый мерцающий блик — по одной бусине, с произвольной паузой;
+       2) волна блика слева направо, когда нить впервые появляется во вьюпорте при скролле;
+       3) та же волна — при наведении курсора на нить.
+     Всё отключается при prefers-reduced-motion. */
+  var strands = document.querySelectorAll(".strand");
+
+  if (strands.length && !prefersReducedMotion) {
+    var FLARE_DURATION = 480; // мс, должно быть меньше паузы между случайными вспышками
+
+    function flareBead(bead) {
+      bead.classList.add("flare");
+      window.setTimeout(function () {
+        bead.classList.remove("flare");
+      }, FLARE_DURATION);
+    }
+
+    function waveFlare(beads) {
+      beads.forEach(function (bead, i) {
+        window.setTimeout(function () {
+          flareBead(bead);
+        }, i * 110);
+      });
+    }
+
+    strands.forEach(function (strand) {
+      var beads = Array.prototype.slice.call(strand.querySelectorAll("span"));
+      if (!beads.length) return;
+
+      /* 1) Случайный фоновый блик: рекурсивный setTimeout со случайной паузой,
+         чтобы бусины на разных нитях никогда не мигали синхронно/механически. */
+      (function scheduleRandomFlare() {
+        var delay = 900 + Math.random() * 1900;
+        window.setTimeout(function () {
+          var bead = beads[Math.floor(Math.random() * beads.length)];
+          flareBead(bead);
+          scheduleRandomFlare();
+        }, delay);
+      })();
+
+      /* 2) Волна при первом появлении нити во вьюпорте */
+      if ("IntersectionObserver" in window) {
+        var observer = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                waveFlare(beads);
+                observer.unobserve(strand);
+              }
+            });
+          },
+          { threshold: 0.4 }
+        );
+        observer.observe(strand);
+      }
+
+      /* 3) Волна при наведении курсора — с небольшим троттлингом, чтобы частые
+         mouseenter (например, при скролле мышью над нитью) не запускали волну слишком часто. */
+      var lastHoverWave = 0;
+      strand.addEventListener("mouseenter", function () {
+        var now = Date.now();
+        if (now - lastHoverWave < FLARE_DURATION + beads.length * 110) return;
+        lastHoverWave = now;
+        waveFlare(beads);
+      });
+    });
+  }
+
+  /* ------------------- Витринный эффект на фото украшений ------------------- */
+  /* «Прожектор» и лёгкие искры на фотографиях (галерея + фото в блоке «О шоуруме»):
+     курсор двигает световое пятно (--spot-x/--spot-y/--spot-o из CSS), а рядом с ним
+     иногда рождается и гаснет маленькая искра-блик — имитация игры света на украшении. */
+  var showcasePhotos = document.querySelectorAll(".gallery-tile:not(.cta), .about-photo");
+
+  if (showcasePhotos.length && !prefersReducedMotion) {
+    var SPARKLE_MIN_GAP = 130; // мс между искрами на одном фото
+    var SPARKLE_MAX_LIVE = 6; // не более N одновременных искр на одном фото
+
+    showcasePhotos.forEach(function (photo) {
+      var lastSparkleAt = 0;
+
+      function spawnSparkle(x, y) {
+        if (photo.querySelectorAll(".sparkle").length >= SPARKLE_MAX_LIVE) return;
+
+        var sparkle = document.createElement("span");
+        sparkle.className = "sparkle";
+        sparkle.setAttribute("aria-hidden", "true");
+
+        var jitterX = (Math.random() - 0.5) * 18;
+        var jitterY = (Math.random() - 0.5) * 18;
+        var size = 6 + Math.random() * 8;
+
+        sparkle.style.left = (x + jitterX) + "px";
+        sparkle.style.top = (y + jitterY) + "px";
+        sparkle.style.width = size + "px";
+        sparkle.style.height = size + "px";
+
+        photo.appendChild(sparkle);
+        window.setTimeout(function () {
+          if (sparkle.parentNode) sparkle.parentNode.removeChild(sparkle);
+        }, 700);
+      }
+
+      function handleMove(e) {
+        var rect = photo.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+
+        var x = e.clientX - rect.left;
+        var y = e.clientY - rect.top;
+        var relX = Math.min(Math.max(x / rect.width, 0), 1);
+        var relY = Math.min(Math.max(y / rect.height, 0), 1);
+
+        photo.style.setProperty("--spot-x", (relX * 100).toFixed(1) + "%");
+        photo.style.setProperty("--spot-y", (relY * 100).toFixed(1) + "%");
+        photo.style.setProperty("--spot-o", "1");
+
+        var now = Date.now();
+        if (now - lastSparkleAt > SPARKLE_MIN_GAP) {
+          lastSparkleAt = now;
+          spawnSparkle(x, y);
+        }
+      }
+
+      function resetSpotlight() {
+        photo.style.setProperty("--spot-o", "0");
+      }
+
+      photo.addEventListener("mousemove", handleMove);
+      photo.addEventListener("mouseleave", resetSpotlight);
+      photo.addEventListener("blur", resetSpotlight);
+    });
+  }
+
   /* ------------------------- Год копирайта (страховка) ------------------------- */
   // Год в подвале зафиксирован в HTML (2026) согласно текущей дате запуска сайта.
 })();

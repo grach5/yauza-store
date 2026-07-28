@@ -61,6 +61,10 @@
   --parallax-buffer: 110px;
   --parallax-factor: 0.16;
   --parallax-max: 90;
+
+  /* ---- Витринный wow-эффект (спотлайт + искры) на фото украшений ---- */
+  --spot-transition: 320ms var(--ease);
+  --sparkle-color: var(--color-accent-soft);
 }
 
 /* ---------------------------------- Reset ---------------------------------- */
@@ -217,9 +221,35 @@ h2.section-title {
 }
 
 .strand span {
+  position: relative;
   border-radius: 50%;
   background: linear-gradient(155deg, var(--color-accent-soft), var(--color-accent) 55%, var(--color-accent-dim));
   box-shadow: 0 0 0 1px rgba(244, 238, 242, 0.08), 0 6px 14px -6px rgba(201, 162, 74, 0.55);
+}
+
+/* «Живая» бусина: мягкая вспышка блика, которую JS включает по одной бусине за раз —
+   случайно во времени, волной при входе нити в вьюпорт и при наведении курсора.
+   Реализовано отдельным слоем (::after), чтобы не конфликтовать со свойствами,
+   которыми уже управляет keyframe-анимация strand-shimmer на самой бусине. */
+.strand span::after {
+  content: "";
+  position: absolute;
+  inset: -70%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 250, 235, 0.95), rgba(230, 205, 143, 0.55) 42%, transparent 72%);
+  opacity: 0;
+  transform: scale(0.35);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .strand span::after {
+    transition: opacity 420ms var(--ease), transform 420ms var(--ease);
+  }
+  .strand span.flare::after {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .strand span:nth-child(1) { width: 5px; height: 5px; }
@@ -416,11 +446,30 @@ h2.section-title {
   right: 0;
   bottom: 0;
   z-index: -1;
-  background:
-    radial-gradient(560px 420px at 88% -6%, rgba(201, 162, 74, 0.22), transparent 60%),
-    radial-gradient(480px 380px at 6% 18%, rgba(184, 121, 138, 0.16), transparent 65%),
-    linear-gradient(180deg, var(--color-ink) 0%, var(--color-bg) 45%, var(--color-bg) 100%);
+  overflow: hidden;
+  background: var(--color-ink);
   will-change: transform;
+}
+
+/* Реальное фото украшений как фон hero: лежит в самом низу стека,
+   поверх — .hero-bg-overlay (градиенты) для контраста текста, ещё выше — SVG-нить и медальон. */
+.hero-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%;
+  filter: saturate(0.92) brightness(0.62);
+}
+
+.hero-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(560px 420px at 88% -6%, rgba(201, 162, 74, 0.28), transparent 60%),
+    radial-gradient(480px 380px at 6% 18%, rgba(184, 121, 138, 0.2), transparent 65%),
+    linear-gradient(180deg, rgba(21, 14, 25, 0.94) 0%, rgba(27, 18, 32, 0.9) 45%, var(--color-bg) 100%);
 }
 
 /* JS выставляет translate3d(); без JS/при уменьшенном движении остаётся 0 — доп. предохранитель */
@@ -580,9 +629,41 @@ h2.section-title {
 
 .about .container {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 0.75fr) minmax(0, 0.95fr);
   gap: var(--space-6);
   align-items: start;
+}
+
+/* ---------------------------------- About: фото ---------------------------------- */
+.about-photo {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-soft);
+  aspect-ratio: 4 / 5;
+}
+
+.about-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.about-photo figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--color-text);
+  background: linear-gradient(180deg, transparent, rgba(9, 5, 11, 0.82) 70%);
 }
 
 .about-copy p {
@@ -746,19 +827,30 @@ h2.section-title {
   display: flex;
   align-items: flex-end;
   padding: var(--space-3);
+  background: var(--color-surface);
+}
+
+.gallery-tile img {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .gallery-tile::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 40%, rgba(9, 5, 11, 0.75) 100%);
+  z-index: 1;
+  background: linear-gradient(180deg, transparent 40%, rgba(9, 5, 11, 0.78) 100%);
   pointer-events: none;
 }
 
 .gallery-tile span {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   font-family: var(--font-display);
   font-size: 1.05rem;
   color: var(--color-text);
@@ -769,47 +861,123 @@ h2.section-title {
   grid-row: span 2;
 }
 
-/* Decorative CSS "textures" standing in for real showroom photography */
-.tex-velvet {
-  background:
-    repeating-linear-gradient(115deg, rgba(244,238,242,0.05) 0 2px, transparent 2px 9px),
-    radial-gradient(120% 140% at 20% 0%, #4a2a4f, #221328 70%);
+/* --------------------- Витринный wow-эффект: спотлайт + приближение --------------------- *
+ * На фото украшений (галерея + фото в блоке «О шоуруме») курсор ведёт за собой мягкий
+ * прожекторный блик (--spot-x/--spot-y/--spot-o, задаются в script.js), а само изображение
+ * слегка увеличивается и высветляется — как будто витрину подсветили прожектором. */
+.gallery-tile:not(.cta),
+.about-photo {
+  cursor: default;
 }
 
-.tex-facets {
-  background:
-    conic-gradient(from 45deg at 30% 30%, rgba(230,205,143,0.35), transparent 25%),
-    conic-gradient(from 200deg at 80% 70%, rgba(230,205,143,0.25), transparent 30%),
-    linear-gradient(160deg, #2c1f3a, #150e19 75%);
+.gallery-tile:not(.cta)::before,
+.about-photo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 20%), rgba(255, 250, 235, 0.4), transparent 55%);
+  opacity: var(--spot-o, 0);
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
-.tex-chain {
-  background:
-    radial-gradient(circle at 15% 25%, rgba(201,162,74,0.4) 0 6px, transparent 7px),
-    radial-gradient(circle at 35% 45%, rgba(201,162,74,0.4) 0 6px, transparent 7px),
-    radial-gradient(circle at 55% 65%, rgba(201,162,74,0.4) 0 6px, transparent 7px),
-    radial-gradient(circle at 75% 85%, rgba(201,162,74,0.4) 0 6px, transparent 7px),
-    linear-gradient(160deg, #33253f, #1b1220 80%);
+@media (prefers-reduced-motion: no-preference) {
+  .gallery-tile img,
+  .about-photo img {
+    transition: transform 600ms var(--ease), filter 600ms var(--ease);
+  }
+
+  .gallery-tile:not(.cta)::before,
+  .about-photo::before {
+    transition: opacity var(--spot-transition);
+  }
+
+  .gallery-tile:hover img,
+  .gallery-tile:focus-within img,
+  .about-photo:hover img,
+  .about-photo:focus-within img {
+    transform: scale(1.08);
+    filter: brightness(1.08) saturate(1.08);
+  }
 }
 
-.tex-pearl {
-  background:
-    radial-gradient(circle at 25% 30%, rgba(244,238,242,0.5) 0 18px, transparent 19px),
-    radial-gradient(circle at 60% 60%, rgba(244,238,242,0.35) 0 22px, transparent 23px),
-    radial-gradient(circle at 80% 20%, rgba(244,238,242,0.3) 0 12px, transparent 13px),
-    linear-gradient(160deg, #3a2848, #17101c 75%);
+/* Искры-блики (span.sparkle) добавляются и удаляются через script.js рядом с курсором */
+.sparkle {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, #fffaf0 0%, var(--sparkle-color) 45%, transparent 72%);
+  clip-path: polygon(50% 0%, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0% 50%, 39% 39%);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0) rotate(0deg);
 }
 
-.tex-mirror {
-  background:
-    linear-gradient(120deg, rgba(244,238,242,0.14) 0%, transparent 30%, transparent 60%, rgba(184,121,138,0.18) 100%),
-    linear-gradient(160deg, #241830, #150e19 80%);
+@media (prefers-reduced-motion: no-preference) {
+  .sparkle {
+    animation: sparkle-pop 650ms ease-out forwards;
+  }
 }
 
-.tex-box {
-  background:
-    repeating-linear-gradient(45deg, rgba(201,162,74,0.14) 0 3px, transparent 3px 22px),
-    linear-gradient(160deg, #2c1f3a, #1b1220 75%);
+@keyframes sparkle-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0) rotate(0deg); }
+  35% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(40deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.25) rotate(85deg); }
+}
+
+/* Плитка-приглашение вместо шестого фото — честно, без выдуманных снимков зала */
+.gallery-tile.cta {
+  background: linear-gradient(155deg, var(--color-surface), var(--color-bg-alt));
+}
+
+.gallery-tile.cta a {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.gallery-tile.cta .cta-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-accent-soft);
+}
+
+.gallery-tile.cta .cta-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--color-text);
+}
+
+.gallery-tile.cta svg {
+  width: 22px;
+  height: 22px;
+  color: var(--color-accent);
+  transition: transform var(--transition);
+}
+
+.gallery-tile.cta a:hover svg {
+  transform: translateX(6px);
+}
+
+@media (min-width: 981px) {
+  .gallery-tile.cta {
+    grid-column: span 2;
+  }
+  .gallery-tile.cta a {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
 }
 
 /* ---------------------------------- Reviews ---------------------------------- */
@@ -942,7 +1110,7 @@ h2.section-title {
 }
 
 .form-row.two {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .field label {
@@ -1266,7 +1434,9 @@ h2.section-title {
   .about .container,
   .order .container,
   .contacts .container {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), а не голое 1fr: иначе трек не сжимается ниже
+       min-content содержимого (кнопки/поля) и ломает 360px без скролла */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .hero-jewel {
@@ -1284,7 +1454,7 @@ h2.section-title {
   }
 
   .reviews-panel {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     text-align: center;
   }
 
@@ -1306,9 +1476,10 @@ h2.section-title {
   .payment-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
 
-@media (max-width: 760px) {
+  /* Мобильное off-canvas меню включается уже с 980px (а не с 760px): при семи пунктах
+     навигации + телефоне + кнопке «Заказать» строка шапки физически не помещается на
+     планшетных ширинах (761–980px) и раньше вызывала горизонтальный скролл. */
   .main-nav {
     position: fixed;
     inset: 72px 0 0 0;
@@ -1355,9 +1526,11 @@ h2.section-title {
   .header-cta .btn-primary.header-only {
     display: none;
   }
+}
 
+@media (max-width: 760px) {
   .catalog-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .gallery-grid {
@@ -1366,11 +1539,11 @@ h2.section-title {
   }
 
   .payment-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .form-row.two {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .reviews-panel,
@@ -1381,7 +1554,11 @@ h2.section-title {
 
 @media (max-width: 480px) {
   .gallery-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gallery-tile.cta {
+    grid-column: auto;
   }
 
   .gallery-tile.tall {
